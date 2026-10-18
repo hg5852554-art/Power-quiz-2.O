@@ -1,0 +1,274 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Power Quiz 2.0</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;padding:18px;min-height:100vh;color:white;
+ font-family:Arial,sans-serif;
+ background:linear-gradient(135deg,#100d35,#252b70,#741d75)
+}
+.app{max-width:600px;margin:auto}
+h1{text-align:center;color:#ffe66d}
+.panel{
+ background:#ffffff13;border:1px solid #ffffff30;
+ border-radius:18px;padding:18px;margin:14px 0
+}
+select,input,button{
+ width:100%;padding:13px;margin:7px 0;
+ border:0;border-radius:10px;font-size:16px
+}
+button{background:#ffe66d;color:#211344;font-weight:bold}
+button:disabled{opacity:.5}
+.option{background:#fff;color:#201440;text-align:left}
+.small{font-size:14px;color:#ddd}
+#timer{font-size:25px;color:#ffe66d;font-weight:bold}
+#question{font-size:21px;line-height:1.5}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>⚡ POWER QUIZ 2.0</h1>
+<p style="text-align:center">MATHS • PRACTICE • BATTLE</p>
+
+<div class="panel" id="setup">
+<label>Choose class or exam</label>
+<select id="level">
+<option value="1">Class 1</option>
+<option value="2">Class 2</option>
+<option value="3">Class 3</option>
+<option value="4">Class 4</option>
+<option value="5">Class 5</option>
+<option value="6">Class 6</option>
+<option value="7">Class 7</option>
+<option value="8">Class 8</option>
+<option value="9">Class 9</option>
+<option value="10">Class 10</option>
+<option value="11">Class 11</option>
+<option value="12">Class 12</option>
+<option value="main">JEE Main</option>
+<option value="advanced">JEE Advanced</option>
+</select>
+<label>Game mode</label>
+<select id="mode">
+<option value="solo">Solo Quiz</option>
+<option value="battle">1 vs 1 (same phone)</option>
+</select>
+<input id="p1" placeholder="Player 1 name">
+<input id="p2" placeholder="Player 2 name (for battle)">
+<button onclick="startGame()">🚀 START QUIZ</button>
+<p class="small">20 questions per round. Choose your answer before time runs out.</p>
+</div>
+
+<div class="panel hidden" id="game">
+<div id="who"></div>
+<div id="timer">30</div>
+<div id="progress"></div>
+<div id="question"></div>
+<div id="options"></div>
+<p id="feedback"></p>
+</div>
+
+<div class="panel hidden" id="result">
+<h2>🏆 Result</h2>
+<div id="resultText"></div>
+<button onclick="showBoard()">View Leaderboard</button>
+<button onclick="resetGame()">Play Again</button>
+</div>
+
+<div class="panel" id="board">
+<h2>🏆 Local Leaderboard</h2>
+<p class="small">Scores saved on this device/browser.</p>
+<div id="scores"></div>
+<button onclick="hideBoard()">Back</button>
+<button onclick="clearBoard()">Clear Leaderboard</button>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let questions=[],index=0,player=0,scores=[0,0];
+let names=[],mode="solo",level="1";
+let timeLeft=30,tick=null,locked=false;
+let answers=[];
+
+function rand(n){return Math.floor(Math.random()*n)+1}
+function makeQ(text,answer){
+ answer=Math.round(answer*100)/100;
+ let opts=new Set([answer]);
+ while(opts.size<4){
+   let delta=rand(10);
+   let v=Math.random()<.5?answer+delta:answer-delta;
+   v=Math.round(v*100)/100;
+   opts.add(v);
+ }
+ return {text,answer,opts:[...opts].sort(()=>Math.random()-.5)};
+}
+function generateQ(){
+ let a,b,x,ans;
+ if(level==="main"||level==="advanced"){
+   let type=rand(4);
+   if(type===1){
+     a=rand(9);b=rand(9);
+     return makeQ(`If x² − ${a+b}x + ${a*b} = 0, what is the sum of its roots?`,a+b);
+   }
+   if(type===2){
+     a=rand(8);b=rand(8);
+     return makeQ(`For f(x) = x² + ${a}x + ${b}, find f′(${b}).`,2*b+a);
+   }
+   if(type===3){
+     a=rand(8);b=rand(8);
+     return makeQ(`If the roots of x² − ${a+b}x + ${a*b} = 0 are α and β, find αβ.`,a*b);
+   }
+   a=rand(8);
+   return makeQ(`Evaluate the discriminant of x² − ${2*a}x + ${a*a-1} = 0.`,4);
+ }
+ if(Number(level)<=5){
+   a=rand(20);b=rand(20);
+   let op=rand(4);
+   if(op===1)return makeQ(`${a} + ${b} = ?`,a+b);
+   if(op===2)return makeQ(`${Math.max(a,b)} − ${Math.min(a,b)} = ?`,Math.abs(a-b));
+   if(op===3)return makeQ(`${a} × ${b} = ?`,a*b);
+   return makeQ(`${a*b} ÷ ${a} = ?`,b);
+ }
+ if(Number(level)<=8){
+   a=rand(20);b=rand(12);
+   let op=rand(3);
+   if(op===1)return makeQ(`Solve: x + ${a} = ${a+b}. Find x.`,b);
+   if(op===2)return makeQ(`${a}² = ?`,a*a);
+   return makeQ(`Find ${b*10}% of ${a*10}.`,b*a);
+ }
+ if(Number(level)<=10){
+   a=rand(12);b=rand(12);
+   if(rand(2)===1)return makeQ(`Solve: ${a}x = ${a*b}. Find x.`,b);
+   return makeQ(`If x² = ${a*a}, what is the positive value of x?`,a);
+ }
+ a=rand(9);b=rand(9);
+ let op=rand(3);
+ if(op===1)return makeQ(`If x² − ${a+b}x + ${a*b}=0, find the sum of roots.`,a+b);
+ if(op===2)return makeQ(`For f(x)=x² + ${a}x, find f′(${b}).`,2*b+a);
+ return makeQ(`If x² − ${a+b}x + ${a*b}=0, find the product of roots.`,a*b);
+}
+function startGame(){
+ level=$("level").value;
+ mode=$("mode").value;
+ names=[$("p1").value.trim()||"Player 1",
+        $("p2").value.trim()||"Player 2"];
+ if(mode==="solo")names[1]="";
+ index=0;player=0;scores=[0,0];answers=[];
+ questions=Array.from({length:20},()=>generateQ());
+ $("setup").classList.add("hidden");
+ $("result").classList.add("hidden");
+ $("game").classList.remove("hidden");
+ nextQuestion();
+}
+function nextQuestion(){
+ clearInterval(tick);
+ if(index>=20){
+   if(mode==="battle"&&player===0){
+     player=1;index=0;
+     $("feedback").textContent="Player 1 finished! Now Player 2's turn.";
+     questions=Array.from({length:20},()=>generateQ());
+     setTimeout(nextQuestion,1200);
+     return;
+   }
+   finishGame();return;
+ }
+ locked=false;
+ $("who").textContent="👤 "+names[player];
+ $("progress").textContent=`Question ${index+1} of 20`;
+ $("question").textContent=questions[index].text;
+ $("feedback").textContent="";
+ $("options").innerHTML="";
+ questions[index].opts.forEach(v=>{
+   let btn=document.createElement("button");
+   btn.className="option";
+   btn.textContent=v;
+   btn.onclick=()=>answer(v);
+   $("options").appendChild(btn);
+ });
+ timeLeft=(level==="main"||level==="advanced")?1800:30;
+ updateTimer();
+ tick=setInterval(()=>{
+   timeLeft--;updateTimer();
+   if(timeLeft<=0){
+     clearInterval(tick);
+     locked=true;
+     $("feedback").textContent="⏰ Time's up!";
+     setTimeout(()=>{index++;nextQuestion()},700);
+   }
+ },1000);
+}
+function updateTimer(){
+ let m=Math.floor(timeLeft/60),s=timeLeft%60;
+ $("timer").textContent=(level==="main"||level==="advanced")
+ ?`⏱️ ${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
+ :`⏱️ ${timeLeft} seconds`;
+}
+function answer(v){
+ if(locked)return;
+ locked=true;
+ clearInterval(tick);
+ let q=questions[index];
+ if(v===q.answer){
+   scores[player]++;
+   $("feedback").textContent="✅ Correct! +1 point";
+ }else{
+   $("feedback").textContent="❌ Correct answer: "+q.answer;
+ }
+ document.querySelectorAll(".option").forEach(b=>b.disabled=true);
+ setTimeout(()=>{index++;nextQuestion()},800);
+}
+function finishGame(){
+ clearInterval(tick);
+ $("game").classList.add("hidden");
+ $("result").classList.remove("hidden");
+ let text=`${names[0]}: ${scores[0]} / 20`;
+ if(mode==="battle"){
+   text+=`<br>${names[1]}: ${scores[1]} / 20`;
+   text+="<br><br>"+(scores[0]===scores[1]?"It's a draw!":scores[0]>scores[1]?names[0]+" wins!":names[1]+" wins!");
+ }
+ $("resultText").innerHTML=text;
+ saveScore(names[0],scores[0]);
+ if(mode==="battle")saveScore(names[1],scores[1]);
+}
+function saveScore(name,score){
+ let data=JSON.parse(localStorage.getItem("powerQuizScores")||"[]");
+ data.push({name,score,date:new Date().toLocaleDateString()});
+ data.sort((a,b)=>b.score-a.score);
+ localStorage.setItem("powerQuizScores",JSON.stringify(data.slice(0,20)));
+}
+function showBoard(){
+ $("result").classList.add("hidden");
+ $("board").classList.remove("hidden");
+ renderBoard();
+}
+function renderBoard(){
+ let data=JSON.parse(localStorage.getItem("powerQuizScores")||"[]");
+ $("scores").innerHTML=data.length?data.map((p,i)=>
+ `${i+1}. ${escapeHTML(p.name)} — ${p.score}/20 (${p.date})`
+ ).join("<br>"):"No scores yet. Play a quiz first!";
+}
+function escapeHTML(s){
+ return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function hideBoard(){$("board").classList.add("hidden");$("setup").classList.remove("hidden");}
+function resetGame(){
+ $("result").classList.add("hidden");
+ $("setup").classList.remove("hidden");
+}
+function clearBoard(){
+ if(confirm("Clear all scores on this device?")){
+  localStorage.removeItem("powerQuizScores");renderBoard();
+ }
+}
+renderBoard();
+</script>
+</body>
+  </html>
+  
